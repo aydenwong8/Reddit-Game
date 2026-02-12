@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+    .pixel-card {
+        background: #202020; color: #fff;
+        width: 500px; padding: 20px; margin: 20px auto;
+        border-radius: 12px; font-family: 'Segoe UI', sans-serif; text-align: center;
+        border: 1px solid #444; box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+        min-height: 600px;
+        display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .img-frame {
+        width: 100%;
+        max-width: 400px;
+        height: 350px;
+        margin: 10px auto;
+        background: #000;
+        border: 4px solid #333;
+        display: flex; align-items: center; justify-content: center;
+        overflow: hidden;
+        position: relative;
+    }
+    .game-img {
+        max-width: 100%;
+        max-height: 100%;
+        width: auto; height: auto;
+        object-fit: contain;
+        image-rendering: pixelated;
+    }
+    .ui-area { margin-top: auto; padding-top: 10px; }
+    input { padding: 12px; width: 60%; font-size: 16px; border-radius: 6px; border: none; outline: none; margin-bottom: 10px; }
+    button { padding: 10px 15px; font-size: 14px; font-weight: bold; margin: 5px; border: none; border-radius: 4px; cursor: pointer; transition: 0.2s; }
+    button:hover { transform: scale(1.05); }
+    .btn-guess { background: #00e676; color: #003300; }
+    .btn-giveup { background: #ff3d00; color: white; }
+    .btn-reload { background: #2979ff; color: white; display: none; width: 80%; margin: 15px auto; padding: 12px; }
+</style>
+</head>
+<body>
+
+<div class="pixel-card">
+    <div>
+        <div style="display:flex; justify-content:space-between; color:#888; font-size: 0.9em;">
+            <span id="stage-txt">Stage 1/5</span>
+        </div>
+        <h2 id="title-txt" style="margin: 10px 0;">Mystery Meme</h2>
+    </div>
+
+    <div class="img-frame">
+        <img id="game-img" class="game-img" src="">
+    </div>
+
+    <div class="ui-area" id="ui-controls">
+        <input type="text" id="guess-inp" placeholder="Who is this?" onkeydown="if(event.key==='Enter') window.doGuess()">
+        <br>
+        <button class="btn-guess" onclick="window.doGuess()">GUESS</button>
+        <div style="margin-top: 10px;">
+            <button class="btn-giveup" onclick="window.giveUp()">Give Up</button>
+        </div>
+    </div>
+
+    <div id="feedback" style="height:25px; font-weight:bold; color:#ffea00; margin-top:10px;"></div>
+
+    <button class="btn-reload" onclick="location.reload()">Play Again ⟳</button>
+</div>
+
+<script>
+    // all game data will be injected here as an array
+    var allData = __DATA_PAYLOAD__;
+    var initialIndex = __INITIAL_INDEX__;
+
+    (function() {
+        var data = null;
+        var stage = 1;
+        var wrongCount = 0;
+        var active = true;
+
+        function pickRandomIndex(exclude) {
+            if(!allData || allData.length === 0) return -1;
+            if(allData.length === 1) return 0;
+            var idx;
+            do {
+                idx = Math.floor(Math.random() * allData.length);
+            } while (idx === exclude);
+            return idx;
+        }
+
+        function initGameByIndex(idx) {
+            if(idx < 0 || idx >= allData.length) return;
+            data = allData[idx];
+            stage = 1;
+            wrongCount = 0;
+            active = true;
+            document.getElementById("game-img").src = data.images['1'];
+            document.getElementById("stage-txt").innerText = "Stage 1/5";
+            document.getElementById("title-txt").innerText = 'Mystery Meme';
+            document.getElementById("ui-controls").style.display = "block";
+            document.querySelector(".btn-reload").style.display = "none";
+            msg('', '#ffea00');
+        }
+
+        // On first load: if an initialIndex was provided and not yet shown in this session,
+        // show it; afterwards, refreshes pick a random new image.
+        var usedInitial = sessionStorage.getItem('initialShown');
+        if(initialIndex >= 0 && !usedInitial) {
+            initGameByIndex(initialIndex);
+            sessionStorage.setItem('initialShown', '1');
+        } else {
+            initGameByIndex(pickRandomIndex(-1));
+        }
+
+        window.doGuess = function() {
+            if(!active || !data) return;
+            var inp = document.getElementById("guess-inp");
+            var g = inp.value.trim().toLowerCase();
+            if(!g) return;
+
+            if(data.clean_name.includes(g) || g.includes(data.clean_name)) {
+                endGame(true);
+            } else {
+                msg("❌ Try again!", "#ff3d00");
+                inp.value = "";
+                wrongCount += 1;
+                if(stage < 5) {
+                    stage += 1;
+                    document.getElementById("game-img").src = data.images[stage];
+                    document.getElementById("stage-txt").innerText = "Stage " + stage + "/5";
+                }
+            }
+        };
+
+        window.giveUp = function() {
+            if(!data) return;
+            // reveal answer briefly then load a new different game
+            endGame(false);
+            setTimeout(function() {
+                initGameByIndex(pickRandomIndex(allData.indexOf(data)));
+            }, 1200);
+        };
+
+        // Play Again -> load a new different game
+        document.querySelector('.btn-reload').onclick = function() {
+            initGameByIndex(pickRandomIndex(allData.indexOf(data)));
+        };
+
+        function endGame(win) {
+            active = false;
+            document.getElementById("game-img").src = data.images["answer"];
+            document.getElementById("title-txt").innerText = data.name;
+            document.getElementById("ui-controls").style.display = "none";
+            document.querySelector(".btn-reload").style.display = "block";
+            msg(win ? "✅ CORRECT!" : "❌ GAME OVER", win ? "#00e676" : "#ff3d00");
+        }
+
+        function msg(t, c) {
+            var el = document.getElementById("feedback");
+            el.innerText = t;
+            el.style.color = c;
+        }
+    })();
+</script>
+</body>
+</html>

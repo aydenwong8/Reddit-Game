@@ -1,0 +1,8 @@
+﻿{
+  "name": "reddit-game",
+  "version": "1.0.0",
+  "web": {
+    "client": "dist",
+    "server": "src/server/index.js"
+  }
+}

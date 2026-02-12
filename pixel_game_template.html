@@ -11,6 +11,16 @@
         min-height: 600px;
         display: flex; flex-direction: column; justify-content: space-between;
     }
+    #stage-txt { display: none; }
+    .btn-exit { background:#b71c1c; color:white; padding:6px 10px; border-radius:6px; border:none; cursor:pointer; }
+    .start-screen {
+        display:flex; align-items:center; justify-content:center;
+        background: linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.6)); flex-direction:column;
+        gap:16px; color:#fff; border-radius: 12px; padding: 40px 20px;
+    }
+    #game-container { display: none; width: 100%; }
+    .start-screen h1 { margin: 0; font-size: 28px; }
+    .start-btn { padding:12px 20px; font-size:16px; border-radius:8px; background:#2979ff; color:#fff; border:none; cursor:pointer; }
     .img-frame {
         width: 100%;
         max-width: 400px;
@@ -41,9 +51,15 @@
 <body>
 
 <div class="pixel-card">
-    <div>
+    <div id="start-screen" class="start-screen">
+        <h1>Guess the Meme</h1>
+        <button class="start-btn" id="start-btn">Start</button>
+        <button class="btn-exit" id="exit-btn">Exit Game</button>
+    </div>
+    <div id="game-container">
         <div style="display:flex; justify-content:space-between; color:#888; font-size: 0.9em;">
             <span id="stage-txt">Stage 1/5</span>
+            <button class="btn-exit" style="margin-left:auto;" onclick="window.exitGame()">Exit</button>
         </div>
         <h2 id="title-txt" style="margin: 10px 0;">Mystery Meme</h2>
     </div>
@@ -53,9 +69,11 @@
     </div>
 
     <div class="ui-area" id="ui-controls">
-        <input type="text" id="guess-inp" placeholder="Who is this?" onkeydown="if(event.key==='Enter') window.doGuess()">
-        <br>
-        <button class="btn-guess" onclick="window.doGuess()">GUESS</button>
+        <div id="options" style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+            <button class="btn-guess" id="opt1" onclick="window.doGuessOption(0)"></button>
+            <button class="btn-guess" id="opt2" onclick="window.doGuessOption(1)"></button>
+            <button class="btn-guess" id="opt3" onclick="window.doGuessOption(2)"></button>
+        </div>
         <div style="margin-top: 10px;">
             <button class="btn-giveup" onclick="window.giveUp()">Give Up</button>
         </div>
@@ -73,76 +91,107 @@
 
     (function() {
         var data = null;
-        var stage = 1;
-        var wrongCount = 0;
         var active = true;
+        var currentIndex = -1;
+        var startIndex = -1;
 
-        function pickRandomIndex(exclude) {
-            if(!allData || allData.length === 0) return -1;
-            if(allData.length === 1) return 0;
-            var idx;
-            do {
-                idx = Math.floor(Math.random() * allData.length);
-            } while (idx === exclude);
-            return idx;
+        function shuffle(arr) {
+            for (var i = arr.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+            }
+            return arr;
+        }
+
+        function pickTwoOthers(idx) {
+            if (!allData || allData.length <= 1) return [];
+            var pool = [];
+            for (var i = 0; i < allData.length; i++) if (i !== idx) pool.push(i);
+            if (pool.length <= 2) return pool.slice(0, 2);
+            var a = Math.floor(Math.random() * pool.length);
+            var first = pool.splice(a, 1)[0];
+            var b = Math.floor(Math.random() * pool.length);
+            var second = pool.splice(b, 1)[0];
+            return [first, second];
+        }
+
+        function renderOptions() {
+            var optsEl = document.getElementById('options');
+            if (!data) return;
+            if (allData.length >= 3) {
+                optsEl.style.display = 'flex';
+                var others = pickTwoOthers(currentIndex);
+                var choices = [allData[others[0]].name, allData[others[1]].name, data.name];
+                shuffle(choices);
+                for (var i = 1; i <= 3; i++) {
+                    var btn = document.getElementById('opt' + i);
+                    btn.innerText = choices[i - 1];
+                    btn.dataset.choice = choices[i - 1];
+                    btn.style.display = 'block';
+                }
+            } else {
+                optsEl.style.display = 'none';
+            }
         }
 
         function initGameByIndex(idx) {
-            if(idx < 0 || idx >= allData.length) return;
+            if (idx < 0 || idx >= allData.length) return;
+            currentIndex = idx;
             data = allData[idx];
-            stage = 1;
-            wrongCount = 0;
             active = true;
-            document.getElementById("game-img").src = data.images['1'];
-            document.getElementById("stage-txt").innerText = "Stage 1/5";
+            // show stage 3 image only
+            document.getElementById("game-img").src = data.images['3'];
             document.getElementById("title-txt").innerText = 'Mystery Meme';
             document.getElementById("ui-controls").style.display = "block";
             document.querySelector(".btn-reload").style.display = "none";
             msg('', '#ffea00');
+            renderOptions();
         }
 
-        // On first load: if an initialIndex was provided and not yet shown in this session,
-        // show it; afterwards, refreshes pick a random new image.
         var usedInitial = sessionStorage.getItem('initialShown');
-        if(initialIndex >= 0 && !usedInitial) {
-            initGameByIndex(initialIndex);
-            sessionStorage.setItem('initialShown', '1');
+        if (initialIndex >= 0 && !usedInitial) {
+            startIndex = initialIndex;
         } else {
-            initGameByIndex(pickRandomIndex(-1));
+            startIndex = (allData && allData.length) ? Math.floor(Math.random() * allData.length) : -1;
         }
 
-        window.doGuess = function() {
-            if(!active || !data) return;
-            var inp = document.getElementById("guess-inp");
-            var g = inp.value.trim().toLowerCase();
-            if(!g) return;
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('game-container').style.display = 'block';
+            if (initialIndex >= 0 && !usedInitial) {
+                sessionStorage.setItem('initialShown', '1');
+            }
+            initGameByIndex(startIndex);
+        }
 
-            if(data.clean_name.includes(g) || g.includes(data.clean_name)) {
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('exit-btn').addEventListener('click', function(){ window.exitGame(); });
+
+        window.doGuessOption = function(choiceIndex) {
+            if (!active || !data) return;
+            var btn = document.getElementById('opt' + (choiceIndex + 1));
+            var choice = (btn && btn.dataset.choice) ? btn.dataset.choice.trim().toLowerCase() : '';
+            if (!choice) return;
+
+            var target = data.name.trim().toLowerCase();
+            // one chance only: right -> win, wrong -> immediate loss
+            if (choice === target || target.includes(choice) || choice.includes(target)) {
                 endGame(true);
             } else {
-                msg("❌ Try again!", "#ff3d00");
-                inp.value = "";
-                wrongCount += 1;
-                if(stage < 5) {
-                    stage += 1;
-                    document.getElementById("game-img").src = data.images[stage];
-                    document.getElementById("stage-txt").innerText = "Stage " + stage + "/5";
-                }
+                endGame(false);
             }
         };
 
         window.giveUp = function() {
-            if(!data) return;
-            // reveal answer briefly then load a new different game
+            if (!data) return;
             endGame(false);
             setTimeout(function() {
-                initGameByIndex(pickRandomIndex(allData.indexOf(data)));
+                initGameByIndex((currentIndex + 1) % allData.length);
             }, 1200);
         };
 
-        // Play Again -> load a new different game
         document.querySelector('.btn-reload').onclick = function() {
-            initGameByIndex(pickRandomIndex(allData.indexOf(data)));
+            initGameByIndex((currentIndex + 1) % allData.length);
         };
 
         function endGame(win) {
@@ -159,6 +208,10 @@
             el.innerText = t;
             el.style.color = c;
         }
+
+        window.exitGame = function() {
+            try { window.close(); } catch (e) { window.location.href = 'about:blank'; }
+        };
     })();
 </script>
 </body>

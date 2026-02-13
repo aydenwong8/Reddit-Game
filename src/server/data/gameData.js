@@ -1,44 +1,53 @@
-﻿const folderNames = [
-  "Absolute_Cinema",
-  "All_My_Homies_Hate",
-  "Boardroom_Meeting_Suggestion",
-  "Change_My_Mind",
-  "Distracted_Boyfriend",
-  "Friendship_ended",
-  "Hide_the_Pain_Harold",
-  "I_Bet_Hes_Thinking_About_Other_Women",
-  "Is_This_A_Pigeon",
-  "Pawn_Stars_Best_I_Can_Do",
-  "Sad_Pablo_Escobar",
-  "Surprised_Pikachu",
-  "The_Rock_Driving",
-  "The_Scroll_Of_Truth",
-  "Two_Buttons",
-  "Two_Paths",
-  "Waiting_Skeleton",
-  "Woman_Yelling_At_Cat",
-  "cmon_do_something",
-  "spiderman_pointing_at_spiderman"
-];
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
-const lastGenerated = "spiderman_pointing_at_spiderman";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = path.resolve(__dirname, "../../..");
+const assetsDir = path.join(rootDir, "game_assets");
 
-function toEntry(folder) {
+function hasRequiredFiles(folderPath) {
+  const clue2 = path.join(folderPath, "clue_2.png");
+  const answer = path.join(folderPath, "ANSWER.png");
+  return fs.existsSync(clue2) && fs.existsSync(answer);
+}
+
+function toEntry(folderName) {
+  const memeId = folderName.toLowerCase();
   return {
-    name: folder.replaceAll("_", " "),
-    clean_name: folder.replaceAll("_", " ").toLowerCase(),
+    folderName,
+    memeId,
+    assetKey: `game_assets/${folderName}`,
+    name: folderName.replaceAll("_", " "),
+    clean_name: folderName.replaceAll("_", " ").toLowerCase(),
     images: {
-      "1": `/game_assets/${folder}/clue_1.png`,
-      "2": `/game_assets/${folder}/clue_2.png`,
-      "3": `/game_assets/${folder}/clue_3.png`,
-      "4": `/game_assets/${folder}/clue_4.png`,
-      "5": `/game_assets/${folder}/clue_5.png`,
-      answer: `/game_assets/${folder}/ANSWER.png`
+      "1": `/game_assets/${folderName}/clue_1.png`,
+      "2": `/game_assets/${folderName}/clue_2.png`,
+      "3": `/game_assets/${folderName}/clue_3.png`,
+      "4": `/game_assets/${folderName}/clue_4.png`,
+      "5": `/game_assets/${folderName}/clue_5.png`,
+      stage_2: `/game_assets/${folderName}/clue_2.png`,
+      answer: `/game_assets/${folderName}/ANSWER.png`
     }
   };
 }
 
+function loadFolders() {
+  if (!fs.existsSync(assetsDir)) {
+    return [];
+  }
+
+  return fs
+    .readdirSync(assetsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((folderName) => hasRequiredFiles(path.join(assetsDir, folderName)))
+    .sort((a, b) => a.localeCompare(b));
+}
+
+const folderNames = loadFolders();
 const allData = folderNames.map(toEntry);
-const initialIndex = folderNames.findIndex((folder) => folder === lastGenerated);
+const initialIndex = allData.length ? allData.length - 1 : -1;
 
 export { allData, initialIndex };

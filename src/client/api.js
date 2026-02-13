@@ -34,3 +34,11 @@ export async function apiPost(path, body) {
 
   return handleResponse(response);
 }
+
+export async function startRoundRequest(dateOverride) {
+  const body = {};
+  if (dateOverride) {
+    body.dateOverride = dateOverride;
+  }
+  return apiPost("/api/round/start", body);
+}
